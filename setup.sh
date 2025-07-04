@@ -1,71 +1,50 @@
 #!/bin/bash
 
-echo "Setting up Guessmaster AI..."
+# GuessMaster 20Q Setup Script
+echo "🎯 Setting up GuessMaster 20Q..."
 
-# Check if Python is installed
+# Check if Python 3 is available
 if ! command -v python3 &> /dev/null; then
-    echo "Python 3 is not installed or not in PATH"
-    echo "Please install Python 3.11+ and try again"
+    echo "❌ Python 3 is required but not installed."
     exit 1
 fi
 
-# Check if pip is installed
-if ! command -v pip3 &> /dev/null; then
-    echo "pip3 is not installed"
-    echo "Please install pip3 and try again"
-    exit 1
-fi
-
-# Create virtual environment
-echo "Creating virtual environment..."
-python3 -m venv venv
-if [ $? -ne 0 ]; then
-    echo "Failed to create virtual environment"
-    exit 1
+# Create virtual environment if it doesn't exist
+if [ ! -d "venv" ]; then
+    echo "🐍 Creating virtual environment..."
+    python3 -m venv venv
 fi
 
 # Activate virtual environment
-echo "Activating virtual environment..."
+echo "🔧 Activating virtual environment..."
 source venv/bin/activate
 
-# Install requirements
-echo "Installing Python packages..."
+# Install dependencies
+echo "📦 Installing dependencies..."
 pip install -r requirements.txt
-if [ $? -ne 0 ]; then
-    echo "Failed to install requirements"
-    exit 1
-fi
 
 # Check if .env exists
-if [ ! -f .env ]; then
-    echo "Creating .env file from template..."
-    cp .env .env.local
-    echo "Please edit .env file with your Ollama settings"
-fi
-
-# Run migrations
-echo "Running database migrations..."
-python manage.py migrate
-if [ $? -ne 0 ]; then
-    echo "Failed to run migrations"
-    exit 1
-fi
-
-# Collect static files
-echo "Collecting static files..."
-python manage.py collectstatic --noinput
-if [ $? -ne 0 ]; then
-    echo "Failed to collect static files"
-    exit 1
+if [ ! -f ".env" ]; then
+    if [ -f ".env.template" ]; then
+        echo "📝 Creating .env from template..."
+        cp .env.template .env
+        echo "⚠️  Please edit .env file and configure your Ollama settings before running the server."
+        echo "   Set OLLAMA_URL to point to your Ollama instance."
+    else
+        echo "❌ Neither .env nor .env.template found. Please create .env with your configuration."
+        exit 1
+    fi
+else
+    echo "✅ Environment file found."
 fi
 
 echo ""
-echo "Setup complete!"
+echo "🚀 Setup complete! To start the server:"
+echo "   1. Make sure your Ollama instance is running"
+echo "   2. Configure .env with your Ollama URL if not already done"
+echo "   3. Run: source venv/bin/activate && python manage.py runserver 9090"
+echo "   4. Open: http://localhost:9090"
 echo ""
-echo "To start the development server:"
-echo "1. Make sure Ollama is running with a model (e.g., 'ollama serve' and 'ollama pull llama3')"
-echo "2. Edit .env file with your Ollama settings"
-echo "3. Run: python manage.py runserver"
-echo ""
-echo "The game will be available at: http://localhost:8000"
-echo ""
+echo "🔗 Your current Ollama configuration:"
+echo "   URL: $(grep OLLAMA_URL .env 2>/dev/null || echo 'Not configured')"
+echo "   Model: $(grep OLLAMA_MODEL .env 2>/dev/null || echo 'Not configured')"

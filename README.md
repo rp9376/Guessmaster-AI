@@ -1,281 +1,235 @@
-# 🎯 Guessmaster AI - 20 Questions Game
+# GuessMaster 20Q - AI vs Human
 
-A web-based 20 Questions game where humans compete against an AI powered by Ollama running a LLaMA model. The AI thinks of something, and you have 20 questions to guess what it is!
+A stateless Django web application for playing 20 Questions against an AI powered by Ollama and LLaMA.
 
 ## Features
 
-- 🤖 AI-powered responses using Ollama and LLaMA
-- 💬 Session-based conversation history
-- 🎯 Classic 20 questions gameplay
-- 🌐 Modern web interface
-- 🐳 Docker containerized deployment
-- 📊 PostgreSQL database for session storage
-- 🔄 Game reset functionality
-- 📱 Mobile-responsive design
+- **Stateless Architecture**: No database or session storage required
+- **Real-time Streaming**: AI responses stream in real-time to the frontend
+- **Privacy-Conscious**: All AI communication goes through the backend
+- **Multi-user Support**: Multiple users can play simultaneously without interference
+- **Debug Console**: Full prompt logging in browser console for debugging
+- **Modern UI**: Beautiful, responsive interface with Tailwind CSS
 
 ## Quick Start
 
-### Prerequisites
-
-- Docker and Docker Compose
-- Ollama running locally with LLaMA model
-
-### 1. Set up Ollama
-
-First, install and run Ollama with a LLaMA model:
-
 ```bash
-# Install Ollama (visit https://ollama.ai for installation instructions)
+# 1. Copy environment template
+cp .env.template .env
 
-# Pull a model (e.g., llama3)
-ollama pull llama3
+# 2. Edit .env with your Ollama settings
+nano .env
 
-# Start Ollama server (usually runs on localhost:11434)
-ollama serve
+# 3. Run with Docker (recommended)
+docker-compose up --build -d
+
+# OR run locally
+./setup.sh
+python3 manage.py runserver 9090
 ```
 
-### 2. Clone and Configure
+## Prerequisites
 
+- Python 3.11+
+- **Ollama with LLaMA model already installed and running**
+- Docker (optional, for containerized deployment)
+
+## Quick Start
+
+### Option 1: Local Development
+
+**Quick Setup:**
 ```bash
-git clone <your-repo-url>
-cd Guessmaster-AI
-
-# Copy and edit environment variables
-cp .env.example .env
-# Edit .env file with your settings
+./setup.sh
+# Follow the instructions printed by the setup script
 ```
 
-### 3. Run with Docker Compose
+**Manual Setup:**
 
-```bash
-# Build and start all services
-docker-compose up --build
+1. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-# Or run in background
-docker-compose up -d --build
+2. **Configure environment**:
+   ```bash
+   # Copy the template and edit with your settings
+   cp .env.template .env
+   # Edit .env with your Ollama configuration
+   # Point OLLAMA_URL to your existing Ollama instance
+   ```
+
+3. **Ensure Ollama is running** with your desired model:
+   ```bash
+   # Verify Ollama is accessible
+   curl http://your-ollama-host:11434/api/tags
+   ```
+
+4. **Run Django server**:
+   ```bash
+   python manage.py runserver 9090
+   ```
+
+5. **Open browser**: http://localhost:9090
+
+### Option 2: Docker
+
+**Prerequisites**: Ensure your Ollama instance is accessible from Docker containers.
+
+1. **Configure Ollama URL**: Copy the environment template and configure it:
+   ```bash
+   cp .env.template .env
+   # Edit .env with your Ollama configuration
+   ```
+   
+   Example configurations:
+   ```bash
+   # For Ollama running on host system (from Docker container perspective)
+   OLLAMA_URL=http://host.docker.internal:11434/api/generate
+   # OR for remote Ollama instance
+   OLLAMA_URL=http://your-ollama-server:11434/api/generate
+   ```
+
+2. **Start the web service**:
+   ```bash
+   docker-compose up --build -d
+   ```
+   
+   The container will automatically restart unless manually stopped.
+
+3. **Open browser**: http://localhost:9090
+
+## How It Works
+
+### Game Flow
+1. User visits the homepage and clicks "Start Game"
+2. Frontend sends conversation history to `/api/ask/` endpoint
+3. Backend loads system prompt from `llm_prompt.txt`
+4. Backend sends full prompt (system + history) to Ollama
+5. AI response streams back to frontend in real-time
+6. Process repeats for up to 20 questions
+
+### Architecture
+- **Frontend**: Vanilla JavaScript with fetch API for streaming
+- **Backend**: Django with stateless API endpoint
+- **AI**: Ollama serving LLaMA model locally
+- **State Management**: All game state managed in frontend JavaScript
+
+### API Endpoint
+
+**POST** `/api/ask/`
+
+Request body:
+```json
+{
+  "history": [
+    {"role": "assistant", "content": "Is it alive?"},
+    {"role": "user", "content": "Yes"},
+    ...
+  ]
+}
 ```
 
-The application will be available at:
-- **Game**: http://localhost:8000
-- **Admin**: http://localhost:8000/admin
-- **PgAdmin**: http://localhost:5050
-
-## Manual Setup (Without Docker)
-
-### 1. Install Dependencies
-
-```bash
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-# Windows:
-venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
-
-# Install requirements
-pip install -r requirements.txt
-```
-
-### 2. Set up Database
-
-```bash
-# Install PostgreSQL locally or use SQLite for development
-# Edit .env file for database settings
-
-# Run migrations
-python manage.py migrate
-
-# Create superuser (optional)
-python manage.py createsuperuser
-```
-
-### 3. Run Development Server
-
-```bash
-# Collect static files
-python manage.py collectstatic
-
-# Run development server
-python manage.py runserver
-```
+Response: Server-Sent Events stream with AI response
 
 ## Configuration
 
+### Environment Template
+
+The project includes a `.env.template` file with all configuration options and examples. To set up your environment:
+
+```bash
+# Copy the template
+cp .env.template .env
+
+# Edit .env with your specific settings
+nano .env  # or use your preferred editor
+```
+
 ### Environment Variables (.env)
-
-```env
-# Ollama Configuration
-OLLAMA_URL=http://localhost:11434/api/generate
-OLLAMA_MODEL=llama3
-
-# Django Configuration
+```
+OLLAMA_URL=http://your-ollama-host:11434/api/generate
+OLLAMA_MODEL=llama3.2
 DEBUG=True
-SECRET_KEY=your-secret-key-change-this-in-production
 ALLOWED_HOSTS=localhost,127.0.0.1
-
-# Database Configuration
-DATABASE_URL=postgres://user:password@db:5432/guessmaster
-POSTGRES_DB=guessmaster
-POSTGRES_USER=user
-POSTGRES_PASSWORD=password
-DB_HOST=localhost
-DB_PORT=5432
+SECRET_KEY=your-secret-key-here
+WEB_PORT=9090
 ```
 
-## API Endpoints
+**Note**: Replace `your-ollama-host` with the actual hostname/IP where your Ollama instance is running.
 
-### POST /ask/
-Ask a question to the AI.
-
-**Request:**
-```json
-{
-    "question": "Is it alive?"
-}
-```
-
-**Response:**
-```json
-{
-    "success": true,
-    "response": "No, it is not alive.",
-    "question_count": 1,
-    "max_questions": 20,
-    "is_completed": false,
-    "session_id": "uuid-here"
-}
-```
-
-### POST /reset/
-Reset the current game session.
-
-**Response:**
-```json
-{
-    "success": true,
-    "message": "Game reset successfully",
-    "session_id": "new-uuid-here",
-    "question_count": 0,
-    "is_completed": false
-}
-```
+### System Prompt
+Edit `game/llm_prompt.txt` to customize the AI's behavior and strategy.
 
 ## Project Structure
 
 ```
-Guessmaster-AI/
-├── game/                   # Django app
-│   ├── models.py          # GameSession model
-│   ├── views.py           # API views
-│   ├── utils.py           # Game engine and utilities
-│   ├── urls.py            # URL routing
-│   ├── admin.py           # Django admin configuration
-│   ├── tests.py           # Unit tests
-│   └── templates/         # HTML templates
-│       └── game/
-│           └── game.html  # Main game interface
-├── project/               # Django project settings
-│   ├── settings.py        # Configuration
-│   ├── urls.py            # Root URL routing
-│   ├── wsgi.py           # WSGI configuration
-│   └── asgi.py           # ASGI configuration
-├── manage.py              # Django management script
-├── requirements.txt       # Python dependencies
-├── Dockerfile            # Docker configuration
-├── docker-compose.yml    # Multi-container setup
-├── .env                  # Environment variables
-└── README.md             # This file
+project_root/
+├── manage.py
+├── .env
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
+├── game/
+│   ├── views.py           # API endpoint logic
+│   ├── urls.py
+│   ├── llm_prompt.txt     # AI system instructions
+│   ├── templates/game/
+│   │   └── index.html     # Main game interface  
+│   └── static/js/
+│       └── game.js        # Frontend game logic
+└── project/
+    ├── settings.py        # Django configuration
+    └── urls.py
 ```
 
-## Game Logic
+## Privacy & Security
 
-1. **Session Management**: Each user gets a unique session to track their game
-2. **AI Integration**: Questions are sent to Ollama with full conversation context
-3. **Question Tracking**: System tracks question count and enforces 20-question limit
-4. **Conversation History**: Full Q&A history is maintained and sent to AI for context
-5. **Game Reset**: Users can start new games at any time
+- No user data stored on server
+- All game state managed client-side
+- AI communication proxied through backend
+- CORS configured for development
+- Input validation and sanitization
 
-## Development
+## Debugging
 
-### Running Tests
+The full prompt sent to the LLM is logged in the browser console for debugging purposes. Open browser dev tools (F12) to view:
 
-```bash
-# Run all tests
-python manage.py test
-
-# Run specific app tests
-python manage.py test game
-
-# Run with coverage
-pip install coverage
-coverage run --source='.' manage.py test
-coverage report
+```javascript
+console.log('🔍 DEBUG - Full prompt sent to LLM:', prompt);
 ```
 
-### Database Migrations
+## Customization
 
-```bash
-# Create migrations
-python manage.py makemigrations
+### Modify AI Behavior
+Edit `game/llm_prompt.txt` to change the AI's strategy and personality.
 
-# Apply migrations
-python manage.py migrate
+### Styling
+The UI uses Tailwind CSS. Modify `game/templates/game/index.html` to customize appearance.
 
-# Check migration status
-python manage.py showmigrations
-```
-
-### Admin Interface
-
-Create a superuser to access the Django admin:
-
-```bash
-python manage.py createsuperuser
-```
-
-Then visit http://localhost:8000/admin to manage game sessions.
+### AI Model
+Change `OLLAMA_MODEL` in `.env` to use different models (requires model to be pulled first).
 
 ## Troubleshooting
 
-### Ollama Connection Issues
+### Common Issues
 
-1. Ensure Ollama is running: `ollama serve`
-2. Check if model is available: `ollama list`
-3. Test API directly:
-   ```bash
-   curl -X POST http://localhost:11434/api/generate \
-        -H "Content-Type: application/json" \
-        -d '{"model": "llama3", "prompt": "Hello", "stream": false}'
-   ```
+1. **Ollama connection error**: 
+   - Ensure your Ollama instance is running and accessible
+   - Check the OLLAMA_URL in your .env file
+   - Test connectivity: `curl http://your-ollama-host:11434/api/tags`
+2. **Model not found**: Ensure your specified model is available in your Ollama instance
+3. **Port conflicts**: Change ports in docker-compose.yml if needed
+4. **CORS errors**: Check ALLOWED_HOSTS in settings
+5. **Docker networking**: If using Docker, make sure Ollama is accessible from containers
 
-### Docker Issues
+### Development Tips
 
-1. Check if containers are running: `docker-compose ps`
-2. View logs: `docker-compose logs web`
-3. Rebuild containers: `docker-compose up --build --force-recreate`
-
-### Database Issues
-
-1. Check database connection in Django admin
-2. Run migrations: `python manage.py migrate`
-3. Check PostgreSQL logs: `docker-compose logs db`
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make changes and add tests
-4. Ensure all tests pass
-5. Submit a pull request
+- Check browser console for debug logs
+- Monitor Django console for backend errors
+- Use `docker-compose logs` for container debugging
+- **Test Ollama connectivity**: Visit http://localhost:9090/api/test-ollama/ to verify your Ollama connection
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- Built with Django and PostgreSQL
-- AI powered by Ollama and LLaMA
-- Modern UI with vanilla JavaScript and CSS
+MIT License - feel free to modify and distribute.

@@ -1,10 +1,9 @@
 from django.urls import path
 from . import views
-
-app_name = 'game'
+from . import test_views
 
 urlpatterns = [
-    path('', views.GameView.as_view(), name='home'),
-    path('ask/', views.AskQuestionView.as_view(), name='ask'),
-    path('reset/', views.ResetGameView.as_view(), name='reset'),
+    path('', views.index, name='index'),
+    path('api/ask/', views.ask_ai, name='ask_ai'),
+    path('api/test-ollama/', test_views.test_ollama, name='test_ollama'),
 ]

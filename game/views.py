@@ -1,171 +1,131 @@
+import json
+import os
+import requests
+from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import render
-from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from django.utils.decorators import method_decorator
-from django.views import View
-import json
-import logging
-
-from .utils import OllamaGameEngine, GameSessionManager
-from .models import GameSession
-
-logger = logging.getLogger(__name__)
+from django.conf import settings
 
 
-class GameView(View):
+def index(request):
+    """Serve the main game page."""
+    return render(request, 'game/index.html')
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def ask_ai(request):
     """
-    Main game view for rendering the game interface
+    Handle AI conversation requests.
+    Accepts conversation history and returns AI response.
     """
-    
-    def get(self, request):
-        """Render the game page"""
-        # Get or create game session
-        game_session = GameSessionManager.get_or_create_session(request)
+    try:
+        # Parse request data
+        data = json.loads(request.body)
+        history = data.get('history', [])
         
-        context = {
-            'session_id': str(game_session.session_id),
-            'question_count': game_session.question_count,
-            'conversation_history': game_session.conversation_history,
-            'is_completed': game_session.is_completed,
-            'max_questions': 20
+        # Validate history format
+        if not isinstance(history, list):
+            return JsonResponse({'error': 'History must be an array'}, status=400)
+        
+        # Load system prompt
+        prompt_path = os.path.join(os.path.dirname(__file__), 'llm_prompt.txt')
+        try:
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                system_prompt = f.read().strip()
+        except FileNotFoundError:
+            return JsonResponse({'error': 'System prompt file not found'}, status=500)
+        
+        # Build full conversation for Ollama
+        # Combine system prompt and conversation history into a single prompt
+        full_prompt = system_prompt + "\n\n"
+        
+        for msg in history:
+            if msg['role'] == 'assistant':
+                full_prompt += f"AI: {msg['content']}\n"
+            elif msg['role'] == 'user':
+                full_prompt += f"Human: {msg['content']}\n"
+        
+        # Add the current question prompt
+        full_prompt += "AI: "
+        
+        # Prepare Ollama request for /api/generate endpoint
+        ollama_data = {
+            "model": settings.OLLAMA_MODEL,
+            "prompt": full_prompt,
+            "stream": True,
+            "options": {
+                "temperature": 0.7,
+                "top_p": 0.9,
+            }
         }
         
-        return render(request, 'game/game.html', context)
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class AskQuestionView(View):
-    """
-    API endpoint for asking questions to the AI
-    """
-    
-    def post(self, request):
-        """Handle question submission"""
+        # DEBUG: Print the request details to console
+        print("\n" + "="*60)
+        print("🔍 DEBUG: Ollama Request Details")
+        print("="*60)
+        print(f"URL: {settings.OLLAMA_URL}")
+        print(f"Model: {settings.OLLAMA_MODEL}")
+        print(f"Full Prompt:\n{full_prompt}")
+        print(f"Request Data: {json.dumps(ollama_data, indent=2)}")
+        print("="*60 + "\n")
+        
+        # Make request to Ollama
         try:
-            # Parse request body
-            data = json.loads(request.body)
-            question = data.get('question', '').strip()
-            
-            if not question:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Question is required'
-                }, status=400)
-            
-            # Get or create game session
-            game_session = GameSessionManager.get_or_create_session(request)
-            
-            # Check if game is already completed
-            if game_session.is_completed:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Game is already completed. Please reset to start a new game.'
-                }, status=400)
-            
-            # Check if max questions reached
-            if game_session.question_count >= 20:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Maximum questions reached. Please reset to start a new game.'
-                }, status=400)
-            
-            # Initialize game engine
-            game_engine = OllamaGameEngine()
-            
-            # Validate question
-            validation_result = game_engine.validate_question(question)
-            if not validation_result['valid']:
-                return JsonResponse({
-                    'success': False,
-                    'error': validation_result['error']
-                }, status=400)
-            
-            # Get conversation context
-            conversation_context = game_session.get_conversation_context()
-            
-            # Get AI response
-            ai_result = game_engine.get_ai_response(conversation_context, question)
-            
-            if not ai_result['success']:
-                return JsonResponse({
-                    'success': False,
-                    'error': ai_result['error'],
-                    'details': ai_result.get('details', '')
-                }, status=500)
-            
-            ai_response = ai_result['response']
-            
-            # Add question and answer to session
-            game_session.add_question_answer(question, ai_response)
-            
-            # Check if game should be completed
-            if game_session.question_count >= 20:
-                game_session.is_completed = True
-                game_session.save()
-            
+            response = requests.post(
+                settings.OLLAMA_URL,  # Use the URL directly (already points to /api/generate)
+                json=ollama_data,
+                stream=True,
+                timeout=30
+            )
+            response.raise_for_status()
+            print(f"✅ Successfully connected to Ollama. Status: {response.status_code}")
+        except requests.exceptions.RequestException as e:
+            print(f"❌ ERROR: Failed to connect to Ollama: {str(e)}")
+            print(f"Response status: {getattr(e.response, 'status_code', 'N/A')}")
+            print(f"Response text: {getattr(e.response, 'text', 'N/A')}")
             return JsonResponse({
-                'success': True,
-                'response': ai_response,
-                'question_count': game_session.question_count,
-                'max_questions': 20,
-                'is_completed': game_session.is_completed,
-                'session_id': str(game_session.session_id)
-            })
-            
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'success': False,
-                'error': 'Invalid JSON in request body'
-            }, status=400)
-        except Exception as e:
-            logger.error(f"Error in AskQuestionView: {str(e)}")
-            return JsonResponse({
-                'success': False,
-                'error': 'An unexpected error occurred'
+                'error': f'Failed to connect to Ollama: {str(e)}'
             }, status=500)
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class ResetGameView(View):
-    """
-    API endpoint for resetting the game session
-    """
-    
-    def post(self, request):
-        """Handle game reset"""
-        try:
-            # Reset game session
-            game_session = GameSessionManager.reset_session(request)
-            
-            return JsonResponse({
-                'success': True,
-                'message': 'Game reset successfully',
-                'session_id': str(game_session.session_id),
-                'question_count': game_session.question_count,
-                'is_completed': game_session.is_completed
-            })
-            
-        except Exception as e:
-            logger.error(f"Error in ResetGameView: {str(e)}")
-            return JsonResponse({
-                'success': False,
-                'error': 'Failed to reset game'
-            }, status=500)
-
-
-# Function-based views for backward compatibility
-@csrf_exempt
-@require_http_methods(["POST"])
-def ask_question(request):
-    """Function-based view wrapper for AskQuestionView"""
-    view = AskQuestionView()
-    return view.post(request)
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def reset_game(request):
-    """Function-based view wrapper for ResetGameView"""
-    view = ResetGameView()
-    return view.post(request)
+        
+        # Stream response back to client
+        def generate_response():
+            full_response = ""
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        chunk = json.loads(line.decode('utf-8'))
+                        # For /api/generate endpoint, response is in 'response' field
+                        if 'response' in chunk:
+                            content = chunk['response']
+                            full_response += content
+                            yield f"data: {json.dumps({'content': content})}\n\n"
+                        
+                        if chunk.get('done', False):
+                            # Send debug info with full prompt
+                            debug_info = {
+                                'type': 'debug',
+                                'full_prompt': full_prompt,
+                                'full_response': full_response
+                            }
+                            yield f"data: {json.dumps(debug_info)}\n\n"
+                            yield "data: [DONE]\n\n"
+                            break
+                    except json.JSONDecodeError:
+                        continue
+        
+        return StreamingHttpResponse(
+            generate_response(),
+            content_type='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type',
+            }
+        )
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON in request body'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': f'Internal server error: {str(e)}'}, status=500)

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuessMaster 20Q - AI vs Human</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .typing-indicator {
+            display: inline-block;
+        }
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #9CA3AF;
+            margin: 0 2px;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0s; }
+        
+        @keyframes typing {
+            0%, 80%, 100% { 
+                transform: scale(0);
+                opacity: 0.5;
+            }
+            40% { 
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        
+        .message-bubble {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .game-container {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .card {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="game-container">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-5xl font-bold text-white mb-4">🎯 GuessMaster 20Q</h1>
+            <p class="text-xl text-gray-200">AI vs Human - The Ultimate Guessing Game</p>
+        </div>
+
+        <!-- Game Rules Card -->
+        <div id="rulesCard" class="card rounded-2xl shadow-2xl p-8 mb-8 max-w-2xl mx-auto">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">🎮 How to Play</h2>
+            <div class="space-y-4 text-gray-700">
+                <div class="flex items-start space-x-3">
+                    <span class="text-2xl">🤔</span>
+                    <p><strong>Think of anything:</strong> A person, place, object, animal, or concept</p>
+                </div>
+                <div class="flex items-start space-x-3">
+                    <span class="text-2xl">🤖</span>
+                    <p><strong>AI asks questions:</strong> The AI will ask up to 20 yes/no questions</p>
+                </div>
+                <div class="flex items-start space-x-3">
+                    <span class="text-2xl">✅</span>
+                    <p><strong>Answer honestly:</strong> Reply with "Yes" or "No" to each question</p>
+                </div>
+                <div class="flex items-start space-x-3">
+                    <span class="text-2xl">🏆</span>
+                    <p><strong>Win condition:</strong> Can the AI guess what you're thinking before 20 questions?</p>
+                </div>
+            </div>
+            <div class="text-center mt-8">
+                <button id="startGameBtn" class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 px-8 rounded-xl text-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                    🚀 Start Game
+                </button>
+            </div>
+        </div>
+
+        <!-- Game Interface -->
+        <div id="gameInterface" class="hidden">
+            <!-- Question Counter -->
+            <div class="text-center mb-6">
+                <div class="inline-block card rounded-full px-6 py-3">
+                    <span class="text-lg font-semibold text-gray-700">Question: </span>
+                    <span id="questionCounter" class="text-2xl font-bold text-purple-600">0</span>
+                    <span class="text-lg font-semibold text-gray-700"> / 20</span>
+                </div>
+            </div>
+
+            <!-- AI Question Display -->
+            <div class="card rounded-2xl shadow-2xl p-8 mb-8 max-w-3xl mx-auto">
+                <div class="flex items-start space-x-4">
+                    <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span class="text-white text-xl">🤖</span>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-3">AI Question:</h3>
+                        <div id="aiQuestion" class="text-xl text-gray-700 min-h-12 leading-relaxed">
+                            <div class="typing-indicator">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Answer Buttons -->
+            <div class="text-center mb-8">
+                <div class="flex flex-wrap justify-center gap-4">
+                    <button id="yesBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-12 rounded-xl text-xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                        ✅ Yes
+                    </button>
+                    <button id="noBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-12 rounded-xl text-xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                        ❌ No
+                    </button>
+                    <button id="dontKnowBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 px-8 rounded-xl text-xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                        🤷 I Don't Know
+                    </button>
+                </div>
+                <p class="text-sm text-gray-600 mt-3">
+                    <em>Note: "I Don't Know" responses don't count against your 20 questions</em>
+                </p>
+            </div>
+
+            <!-- Conversation History -->
+            <div class="card rounded-2xl shadow-2xl p-8 max-w-3xl mx-auto">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">📝 Conversation History</h3>
+                <div id="conversationHistory" class="space-y-3 max-h-96 overflow-y-auto">
+                    <!-- History will be populated here -->
+                </div>
+            </div>
+
+            <!-- New Game Button -->
+            <div class="text-center mt-8">
+                <button id="newGameBtn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300">
+                    🔄 New Game
+                </button>
+            </div>
+        </div>
+
+        <!-- End Game Screen -->
+        <div id="endGameScreen" class="hidden">
+            <div class="card rounded-2xl shadow-2xl p-8 mb-8 max-w-2xl mx-auto text-center">
+                <div id="endGameContent">
+                    <!-- Content will be populated by JavaScript -->
+                </div>
+                
+                <div class="mt-8 space-y-4">
+                    <div class="space-x-4">
+                        <button id="playAgainBtn" class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-4 px-8 rounded-xl text-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                            🎮 Play Again
+                        </button>
+                        <button id="viewHistoryBtn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-4 px-8 rounded-xl text-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+                            📝 View Game History
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game History (initially hidden) -->
+            <div id="endGameHistory" class="hidden card rounded-2xl shadow-2xl p-8 max-w-3xl mx-auto">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">🕒 Complete Game History</h3>
+                <div id="endGameHistoryContent" class="space-y-3 max-h-96 overflow-y-auto">
+                    <!-- History will be populated here -->
+                </div>
+                <div class="text-center mt-6">
+                    <button id="hideHistoryBtn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300">
+                        Hide History
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% load static %}
+    <script src="{% static 'js/game.js' %}"></script>
+</body>
+</html>
